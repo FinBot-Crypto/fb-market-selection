@@ -1,0 +1,4 @@
+nats-py[nkey]>=2.7.0
+ccxt>=4.2.0
+pandas>=2.1.0
+asyncio
