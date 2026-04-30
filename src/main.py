@@ -77,8 +77,6 @@ async def get_market_data():
     except Exception as e:
         logger.error(f"Erro ao buscar dados da Binance: {e}")
         return []
-    finally:
-        await asyncio.to_thread(exchange.close)
 
 
 async def connect_nats():
