@@ -101,8 +101,8 @@ async def connect_nats():
                 logger.info("Stream PIPELINE criado.")
 
             # KV Stores
-            kv_market = await js.key_value(bucket='market_cache')
-            kv_positions = await js.key_value(bucket='active_positions')
+            kv_market = await ensure_kv(js, 'market_cache')
+            kv_positions = await ensure_kv(js, 'active_positions')
             logger.info("KV Stores prontas.")
 
             return nc, js, kv_market, kv_positions
