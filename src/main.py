@@ -23,6 +23,8 @@ MIN_VOLUME_USDT = int(os.getenv("MIN_VOLUME_USDT", 10_000_000))
 TOP_N = int(os.getenv("TOP_N", 20))
 NATS_RECONNECT_WAIT = 5  # segundos
 
+# Stablecoins para ignorar na seleção
+STABLECOINS = {"USDC", "FDUSD", "TUSD", "USDP", "BUSD", "DAI", "USD1", "RLUSD", "USDD", "FRAX"}
 
 async def get_market_data():
     """Busca dados da Binance e filtra ativos por liquidez."""
@@ -36,6 +38,11 @@ async def get_market_data():
         for symbol, ticker in tickers.items():
             if not symbol.endswith('/USDT'):
                 continue
+            
+            base_currency = symbol.split('/')[0]
+            if base_currency in STABLECOINS:
+                continue
+                
             vol = ticker.get('quoteVolume')
             last = ticker.get('last')
             pct = ticker.get('percentage')
