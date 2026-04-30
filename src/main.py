@@ -106,12 +106,15 @@ async def connect_nats():
 
             # Garantir Stream PIPELINE
             try:
-                await js.find_stream_name_by_subject("market.updated")
-                logger.info("Stream PIPELINE já existe.")
+                await js.update_stream(
+                    name="PIPELINE",
+                    subjects=["market.>", "strategies.>", "trade.>", "risk.>", "ml.>"],
+                )
+                logger.info("Stream PIPELINE atualizado.")
             except Exception:
                 await js.add_stream(
                     name="PIPELINE",
-                    subjects=["market.>", "strategies.>", "trade.>", "risk.>"],
+                    subjects=["market.>", "strategies.>", "trade.>", "risk.>", "ml.>"],
                 )
                 logger.info("Stream PIPELINE criado.")
 
