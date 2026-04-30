@@ -67,16 +67,26 @@ async def get_market_data():
         top_assets = df.sort_values(by='quoteVolume', ascending=False).head(TOP_N)
 
         now = datetime.utcnow().isoformat()
-        selected = [
-            {
-                "symbol": row['symbol'],
+        selected = []
+        
+        for i, row in top_assets.reset_index().iterrows():
+            symbol = row['symbol']
+            # Classificação por Tier
+            if symbol in ['BTC/USDT', 'ETH/USDT']:
+                tier = "Major"
+            elif i < 10: # Top 10 excluindo Majors (simplificado)
+                tier = "Strong Alt"
+            else:
+                tier = "High Volatility"
+                
+            selected.append({
+                "symbol": symbol,
+                "tier": tier,
                 "volume_24h": row['quoteVolume'],
                 "last_price": row['last'],
                 "change_24h": row['percentage'],
                 "timestamp": now,
-            }
-            for _, row in top_assets.iterrows()
-        ]
+            })
 
         logger.info(f"Selecionados {len(selected)} ativos (de {len(data)} pares USDT).")
         return selected
