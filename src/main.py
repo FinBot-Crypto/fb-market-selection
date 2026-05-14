@@ -25,6 +25,7 @@ NATS_RECONNECT_WAIT = 5  # segundos
 
 # Stablecoins para ignorar na seleção
 STABLECOINS = {"USDC", "FDUSD", "TUSD", "USDP", "BUSD", "DAI", "USD1", "RLUSD", "USDD", "FRAX"}
+FIAT_CURRENCIES = {"EUR", "GBP", "AUD", "BRL", "TRY", "PLN", "RON", "UAH", "ZAR", "NGN"}
 
 async def get_market_data():
     """Busca dados da Binance e filtra ativos por liquidez."""
@@ -40,7 +41,7 @@ async def get_market_data():
                 continue
             
             base_currency = symbol.split('/')[0]
-            if base_currency in STABLECOINS:
+            if base_currency in STABLECOINS or base_currency in FIAT_CURRENCIES:
                 continue
                 
             vol = ticker.get('quoteVolume')
