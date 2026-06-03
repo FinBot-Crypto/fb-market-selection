@@ -22,7 +22,7 @@ UPDATE_INTERVAL = int(os.getenv("UPDATE_INTERVAL", 3600))  # 1 hora
 MIN_VOLUME_USDT = int(os.getenv("MIN_VOLUME_USDT", 10_000_000))
 TOP_N = int(os.getenv("TOP_N", 20))
 NATS_RECONNECT_WAIT = 5  # segundos
-BTC_SMA_PERIOD = int(os.getenv("BTC_SMA_PERIOD", "50"))  # periodos de 1h (~2 dias)
+BTC_SMA_PERIOD = int(os.getenv("BTC_SMA_PERIOD", "12"))  # periodos de 1h (~12h)
 
 # Stablecoins para ignorar na seleção
 STABLECOINS = {"USDC", "FDUSD", "TUSD", "USDP", "BUSD", "DAI", "USD1", "RLUSD", "USDD", "FRAX"}
