@@ -22,10 +22,31 @@ UPDATE_INTERVAL = int(os.getenv("UPDATE_INTERVAL", 3600))  # 1 hora
 MIN_VOLUME_USDT = int(os.getenv("MIN_VOLUME_USDT", 10_000_000))
 TOP_N = int(os.getenv("TOP_N", 20))
 NATS_RECONNECT_WAIT = 5  # segundos
+BTC_SMA_PERIOD = int(os.getenv("BTC_SMA_PERIOD", "50"))  # periodos de 1h (~2 dias)
 
 # Stablecoins para ignorar na seleção
 STABLECOINS = {"USDC", "FDUSD", "TUSD", "USDP", "BUSD", "DAI", "USD1", "RLUSD", "USDD", "FRAX"}
 FIAT_CURRENCIES = {"EUR", "GBP", "AUD", "BRL", "TRY", "PLN", "RON", "UAH", "ZAR", "NGN"}
+
+async def get_btc_trend():
+    """Busca BTC 1h, calcula SMA e retorna bull/bear/neutral."""
+    exchange = ccxt.binance({'enableRateLimit': True})
+    try:
+        ohlcv = await asyncio.to_thread(exchange.fetch_ohlcv, 'BTC/USDT', '1h', limit=BTC_SMA_PERIOD + 10)
+        if not ohlcv or len(ohlcv) < BTC_SMA_PERIOD:
+            return "neutral"
+        closes = [c[4] for c in ohlcv]
+        sma = sum(closes[-BTC_SMA_PERIOD:]) / BTC_SMA_PERIOD
+        current = closes[-1]
+        if current > sma * 1.01:
+            return "bull"
+        elif current < sma * 0.99:
+            return "bear"
+        return "neutral"
+    except Exception as e:
+        logger.error(f"Erro ao buscar trend BTC: {e}")
+        return "neutral"
+
 
 async def get_market_data():
     """Busca dados da Binance e filtra ativos por liquidez."""
@@ -150,7 +171,10 @@ async def main():
             logger.warning("Conexão NATS perdida, reconectando...")
             nc, js, kv_market, kv_positions = await connect_nats()
 
-        # 1. Buscar dados
+        # 1. Buscar trend do BTC
+        btc_trend = await get_btc_trend()
+
+        # 2. Buscar dados
         assets = await get_market_data()
 
         if assets:
@@ -168,7 +192,10 @@ async def main():
                     filtered_assets.append(asset)
 
             if filtered_assets:
-                payload = json.dumps(filtered_assets).encode()
+                payload = json.dumps({
+                    "assets": filtered_assets,
+                    "btc_trend": btc_trend,
+                }).encode()
 
                 # 3. Publicar via JetStream
                 await js.publish("market.updated", payload)
