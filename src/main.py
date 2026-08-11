@@ -5,6 +5,7 @@ import json
 import time
 import ccxt
 import nats
+from nats.js.api import DiscardPolicy, StreamConfig
 from nats.js.errors import NotFoundError
 from datetime import datetime
 import pandas as pd
@@ -23,6 +24,11 @@ MIN_VOLUME_USDT = int(os.getenv("MIN_VOLUME_USDT", 10_000_000))
 TOP_N = int(os.getenv("TOP_N", 20))
 NATS_RECONNECT_WAIT = 5  # segundos
 BTC_SMA_PERIOD = int(os.getenv("BTC_SMA_PERIOD", "12"))  # periodos de 1h (~12h)
+# Retenção do stream PIPELINE: eventos são efêmeros (PostgreSQL guarda histórico).
+NATS_STREAM_MAX_AGE_HOURS = int(os.getenv("NATS_STREAM_MAX_AGE_HOURS", "48"))
+NATS_STREAM_MAX_BYTES = int(os.getenv("NATS_STREAM_MAX_BYTES", str(256 * 1024 * 1024)))
+
+PIPELINE_SUBJECTS = ["market.>", "strategies.>", "trade.>", "risk.>", "ml.>"]
 
 # Stablecoins para ignorar na seleção
 STABLECOINS = {"USDC", "FDUSD", "TUSD", "USDP", "BUSD", "DAI", "USD1", "RLUSD", "USDD", "FRAX"}
@@ -118,6 +124,36 @@ async def get_market_data():
         return []
 
 
+def pipeline_stream_config() -> StreamConfig:
+    """Configura retenção automática — evita crescimento infinito no JetStream."""
+    return StreamConfig(
+        name="PIPELINE",
+        subjects=PIPELINE_SUBJECTS,
+        max_age=NATS_STREAM_MAX_AGE_HOURS * 3600,
+        max_bytes=NATS_STREAM_MAX_BYTES,
+        discard=DiscardPolicy.OLD,
+    )
+
+
+async def ensure_pipeline_stream(js):
+    """Cria ou atualiza o stream PIPELINE com política de retenção."""
+    config = pipeline_stream_config()
+    try:
+        await js.update_stream(config)
+        logger.info(
+            "Stream PIPELINE atualizado (max_age=%sh, max_bytes=%sMB, discard=old).",
+            NATS_STREAM_MAX_AGE_HOURS,
+            NATS_STREAM_MAX_BYTES // (1024 * 1024),
+        )
+    except Exception:
+        await js.add_stream(config)
+        logger.info(
+            "Stream PIPELINE criado (max_age=%sh, max_bytes=%sMB, discard=old).",
+            NATS_STREAM_MAX_AGE_HOURS,
+            NATS_STREAM_MAX_BYTES // (1024 * 1024),
+        )
+
+
 async def connect_nats():
     """Conecta ao NATS com retry infinito."""
     while True:
@@ -126,19 +162,7 @@ async def connect_nats():
             js = nc.jetstream()
             logger.info(f"Conectado ao NATS em {NATS_URL}")
 
-            # Garantir Stream PIPELINE
-            try:
-                await js.update_stream(
-                    name="PIPELINE",
-                    subjects=["market.>", "strategies.>", "trade.>", "risk.>", "ml.>"],
-                )
-                logger.info("Stream PIPELINE atualizado.")
-            except Exception:
-                await js.add_stream(
-                    name="PIPELINE",
-                    subjects=["market.>", "strategies.>", "trade.>", "risk.>", "ml.>"],
-                )
-                logger.info("Stream PIPELINE criado.")
+            await ensure_pipeline_stream(js)
 
             # KV Stores
             kv_market = await ensure_kv(js, 'market_cache')
